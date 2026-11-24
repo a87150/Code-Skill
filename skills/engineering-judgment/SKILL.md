@@ -1,6 +1,6 @@
 ---
 name: engineering-judgment
-description: Use on any coding task: writing, adding, refactoring, fixing, reviewing, or choosing dependencies. Gives a 7-rung ladder (needs to exist, reuse, stdlib, native feature, installed dep, one line, minimal code), countable criteria instead of adjectives (three-strikes abstraction, un-toggled flags, at least two real implementations today), non-negotiable floors (known failure modes, a runnable check), a debug discipline (root cause before any fix), and an evidence gate (no completion claim without a fresh run in the same turn). Measured against a no-rules baseline on the same task: 7-12x less code and 9 of 10 invented requirements eliminated, with crash safety unchanged.
+description: Use on any coding task: writing, adding, refactoring, fixing, reviewing, or choosing dependencies. Gives a 7-rung ladder (needs to exist, reuse, stdlib, native feature, installed dep, one line, minimal code), a plan format that records the decisions an outsider cannot guess, countable criteria instead of adjectives (three-strikes abstraction, un-toggled flags, at least two real implementations today), non-negotiable floors (known failure modes, a runnable check), a debug discipline (root cause before any fix), review reception that verifies before agreeing, and an evidence gate (no completion claim without a fresh run in the same turn). Measured against a no-rules baseline on the same task: 7-12x less code and 9 of 10 invented requirements eliminated, with crash safety unchanged.
 ---
 
 # 工程判断规则
@@ -20,6 +20,22 @@ description: Use on any coding task: writing, adding, refactoring, fixing, revie
 
 阶梯是在理解问题之后才爬的：先读完需求和相关代码，把真实调用链走通，再决定哪级站得住。
 不理解问题就选最小 diff，那不是效率，是第二个 bug。
+
+## 多步任务先给计划，别边想边写
+
+需求要改 3 个以上文件、或跨多次会话才能完成时，先出计划再动手。
+
+计划是写给没见过这个代码库的人看的。他猜不到的是**你的决定**，所以必须写清：要建或改哪些文件、
+每个文件负责什么、关键函数的名字与签名、规格里用到的具体值、每个任务由哪个测试证明它成立。
+
+每一步是一个动作加一个可检验的结果。"完成后端"这种没法验收的不是步骤，
+"写出会失败的测试"才是。
+
+任务边界按"能不能被独立否掉"来切：一个任务一个交付物，配它自己的测试；
+只在 reviewer 可能否掉一个而批准另一个的地方切开。
+
+有 2 个以上互不依赖、无共享状态的任务时并行做，不要串行。派发时要给每个任务划分不同的
+产出目录或文件范围——写冲突的并行等于没并行。
 
 ## 判据：用可数、可验的事实，不用形容词
 
@@ -49,6 +65,8 @@ description: Use on any coding task: writing, adding, refactoring, fixing, revie
 以下措辞一律不用：应该能过、大概没问题、看起来正常、上次跑过了、只跑了一部分。
 "agent 报告成功"不是证据 —— 查 diff、跑测试、看结果，再转述。
 
+交付前拿需求逐条对一遍：规格里每一条，是哪一行代码、哪个测试满足了它。对不上的就是没做完。
+
 ## 调 bug 的纪律
 
 没做完根因调查，不提修复方案。
@@ -60,6 +78,19 @@ description: Use on any coding task: writing, adding, refactoring, fixing, revie
 
 越觉得"这问题很简单""只有一处要改""要现在立刻修好"，越要走这套：
 简单 bug 也有根因，乱撞比系统化慢。
+
+## 收到批评：先验证，再改
+
+技术问题按技术处理，不做情绪表演。
+
+顺序：读完 → 用自己的话复述要求 → 对照代码库核实 → 判断这条建议对当前代码库是否成立 →
+回应 → 逐条改、逐条验证。
+
+不要出现这三种回应："你说得完全对"、"好点子"、"我马上改"。它们都是在核实之前就投降。
+建议站不住就用技术理由反驳，而不是照改。
+
+有任何一条读不懂就停下来，把读不懂的一次问全，不要边改边问——
+这些条目通常互相关联，部分理解等于做错。
 
 ## YAGNI 的边界（别拿它当偷懒的借口）
 
