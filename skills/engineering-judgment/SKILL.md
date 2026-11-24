@@ -1,0 +1,96 @@
+---
+name: engineering-judgment
+description: Use on any coding task: writing, adding, refactoring, fixing, reviewing, or choosing dependencies. Gives a 7-rung ladder (needs to exist, reuse, stdlib, native feature, installed dep, one line, minimal code), countable criteria instead of adjectives (three-strikes abstraction, un-toggled flags, at least two real implementations today), non-negotiable floors (known failure modes, a runnable check), a debug discipline (root cause before any fix), and an evidence gate (no completion claim without a fresh run in the same turn). Measured against a no-rules baseline on the same task: 7-12x less code and 9 of 10 invented requirements eliminated, with crash safety unchanged.
+---
+
+# 工程判断规则
+
+综合自 ponytail（阶梯顺序、根因修复）与 codingskills（可数判据、边界条款），
+并补入两组实测暴露的漏洞。原始 ponytail 规则备份在同目录 `AGENTS.md.ponytail.bak`。
+
+## 写代码前，按顺序停在第一个人站得住的台阶
+
+1. 这功能需要存在吗？不需要就直接说为什么不做。
+2. 仓库里已有实现或模式？复用。
+3. 语言标准库直接有？用。
+4. 平台原生能力覆盖？用。
+5. 已装的依赖能解决？用。
+6. 能写成一行？一行。
+7. 都不成立，才写最小实现。
+
+阶梯是在理解问题之后才爬的：先读完需求和相关代码，把真实调用链走通，再决定哪级站得住。
+不理解问题就选最小 diff，那不是效率，是第二个 bug。
+
+## 判据：用可数、可验的事实，不用形容词
+
+- 第一次遇到重复就直接写，第二次记下，第三次才抽抽象。
+- 功能开关从未切过、配置项从未改过、参数从未传过非默认值 → 删掉。
+- 抽象必须有 ≥2 个今天的真实实现，否则不建接口。
+- 测出性能问题之前不加缓存。
+- 为"以后可能需要"加的列、表、扩展点、事件总线 → 不建。
+- 两个 stdlib 写法一样长时，选边界正确的那个。省代码不是选更脆的算法。
+
+## 不可协商的下限
+
+- 已知失败模式必须处理：无效输入、网络失败、写盘失败、空值、边界索引。来源不可控的数据（第三方导出、用户上传）尤其如此。
+- 非平凡逻辑必须留下一个能跑的检查，按项目现状选标准：项目**已有**测试设施（`package.json` 的 test script、`pytest`、已存在的 test 目录）→ 走 TDD，先写失败的测试再写实现；项目**没有**测试设施 → 3–5 行断言或一个自检脚本，此时不引入测试框架和 fixture。检验标准一致：把这个检查删掉，有没有人能改坏这段逻辑还全绿。
+- 修 bug 打根因：grep 出这个函数的所有调用方，一次改共享函数。只修报告点名的那条路径，等于留下同源的第二个 bug。
+- 安全、可访问性、会导致数据丢失的错误处理，不参与"偷懒"权衡。
+
+## 声称任何状态之前，先拿到本轮证据
+
+没有本轮跑出来的输出，就不能说"通过""修好了""完成"。
+
+1. 先想清楚：哪个命令能证明这句话。
+2. 完整跑一遍。不要复用上一轮的输出。
+3. 读完整输出、退出码、失败数。
+4. 输出支持才说；不支持就说实际状态，不许换成模糊说法。
+
+以下措辞一律不用：应该能过、大概没问题、看起来正常、上次跑过了、只跑了一部分。
+"agent 报告成功"不是证据 —— 查 diff、跑测试、看结果，再转述。
+
+## 调 bug 的纪律
+
+没做完根因调查，不提修复方案。
+
+- 错误信息和堆栈读完，不跳行。
+- 先稳定复现。复现不了就去收集数据，不要猜。
+- 查最近改动：`git diff`、新依赖、配置变化。
+- 一次只改一个变量，验证完再动下一个。
+
+越觉得"这问题很简单""只有一处要改""要现在立刻修好"，越要走这套：
+简单 bug 也有根因，乱撞比系统化慢。
+
+## YAGNI 的边界（别拿它当偷懒的借口）
+
+- 不等于忽略架构：清晰的分层和模块边界不是投机，它让后续改动更便宜。
+- 不等于跳过错误处理：已知会发生的失败不是投机。
+- 不等于拒绝零成本扩展：用 map 代替 switch 这种不花代价的事，做。
+- 与 DRY 冲突时 YAGNI 优先：两个相似但不同的函数，好过统一到错的抽象下。
+
+## 标准库缺位时的陷阱（实测出来的）
+
+"标准库优先" + "不加依赖" 这两条，在标准库没有对应物时会把人推去手写轮子，而且通常没有测试。
+实测案例：Node 没有内置 CSV 解析器，结果花 59–125 行手写 RFC4180 状态机，支持了分隔符嗅探、
+货币符号、欧式小数逗号、UTF-16——需求里一个字都没提，且零测试。
+
+对策，按顺序：
+
+1. 这个格式真的需要完整解析吗？单分隔符、无引号字段，`split` 就够。
+2. 确实需要真解析器时，装依赖比手写便宜——这时"不加依赖"让位。
+3. 手写的解析器必须有测试，因为没有任何人 review 过它的状态机。
+
+## 不做
+
+- 不发明需求。需求没写支持某种格式、某个参数、某种编码，就不做——常见越界项见上一节。
+- 不为没出现的需求建抽象、配置项、插件系统、接口层。
+- 不写没人要求的文档、README、类型体操。
+- 不为简单事实套一层封装。
+
+## 已知取舍要标注
+
+故意砍掉真实角落时（全局锁、O(n²) 扫描、启发式猜断），用 `ponytail:` 前缀的注释写清上限和升级路径。前缀必须是 `ponytail:` ——`/ponytail-debt` 只扫这个前缀，写成 `ceiling:` 或 `TODO:` 就收不进账本，债会烂在原地。
+
+## 优先级
+
+更具体的指令优先：仓库自带的 `AGENTS.md`、当前会话的规则、用户的直接要求，都覆盖本文件。
